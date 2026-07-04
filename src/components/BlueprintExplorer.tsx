@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Folder, File, Code, Database, HelpCircle, Server, Terminal, Shield, Sparkles, ChevronDown, ChevronRight, Check, Cpu, Search, X, ArrowDownAZ, Filter, SlidersHorizontal, Eye } from "lucide-react";
+import { Folder, File, Code, Database, HelpCircle, Server, Terminal, Shield, Sparkles, ChevronDown, ChevronRight, Check, Cpu, Search, X, ArrowDownAZ, Filter, SlidersHorizontal, Eye, GitFork } from "lucide-react";
 import { CodeBlueprint, CODE_BLUEPRINT_JSON_SCHEMA } from "../types";
 import LivePreviewModal from "./LivePreviewModal";
 
@@ -7,6 +7,7 @@ interface BlueprintExplorerProps {
   blueprints: { [key: string]: CodeBlueprint };
   selectedBlueprintId: string;
   onSelectBlueprint: (id: string) => void;
+  onForkBlueprint?: (id: string) => void;
   activeFilePath: string | null;
   onSelectFile: (filePath: string) => void;
   activeColorClass: string;
@@ -19,6 +20,7 @@ export default function BlueprintExplorer({
   blueprints,
   selectedBlueprintId,
   onSelectBlueprint,
+  onForkBlueprint,
   activeFilePath,
   onSelectFile,
   activeColorClass,
@@ -451,6 +453,18 @@ export default function BlueprintExplorer({
                         <Eye className="w-3 h-3" />
                         <span className="hidden sm:inline">Preview</span>
                       </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onForkBlueprint) onForkBlueprint(result.blueprint.id);
+                        }}
+                        className="p-1 rounded bg-white/5 hover:bg-[#00b2ff] text-gray-400 hover:text-black transition-all flex items-center gap-1 cursor-pointer font-sans text-[9px] font-extrabold uppercase border border-white/5 hover:border-transparent active:scale-95"
+                        title="Fork Blueprint to Local Session"
+                      >
+                        <GitFork className="w-3 h-3" />
+                        <span className="hidden sm:inline">Fork</span>
+                      </button>
                       {result.blueprint.id === selectedBlueprintId && (
                         <span className="text-[8px] bg-success-inactive text-success-active border border-success-border/30 px-1 py-0.5 rounded font-mono uppercase font-semibold">
                           Active
@@ -712,6 +726,18 @@ export default function BlueprintExplorer({
                           >
                             <Eye className="w-3 h-3" />
                             <span className="hidden sm:inline">Preview</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onForkBlueprint) onForkBlueprint(bp.id);
+                            }}
+                            className="p-1 rounded bg-white/5 hover:bg-[#00b2ff] text-gray-400 hover:text-black transition-all flex items-center gap-1 cursor-pointer font-sans text-[9px] font-extrabold uppercase border border-white/5 hover:border-transparent active:scale-95"
+                            title="Fork Blueprint to Local Session"
+                          >
+                            <GitFork className="w-3 h-3" />
+                            <span className="hidden sm:inline">Fork</span>
                           </button>
                         </div>
                       </div>

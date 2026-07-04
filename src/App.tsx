@@ -441,6 +441,53 @@ export default function App() {
     setSelectedBlueprintId(id);
   };
 
+  // When forking a blueprint to a local copy
+  const handleForkBlueprint = (id: string) => {
+    const original = blueprints[id];
+    if (!original) return;
+
+    // Deep clone the original blueprint
+    const clone: CodeBlueprint = JSON.parse(JSON.stringify(original));
+    
+    // Create unique ID & Name
+    const uniqueSuffix = Math.random().toString(36).substring(2, 7);
+    const forkId = `${id}_fork_${uniqueSuffix}`;
+    clone.id = forkId;
+    clone.name = `${original.name} (Fork)`;
+    
+    // Ensure "Local Fork" tag exists
+    if (!clone.tags) {
+      clone.tags = [];
+    }
+    if (!clone.tags.includes("Local Fork")) {
+      clone.tags.push("Local Fork");
+    }
+
+    setBlueprints((prev) => ({
+      ...prev,
+      [forkId]: clone
+    }));
+
+    // Select the newly created fork
+    setSelectedBlueprintId(forkId);
+    
+    showNotification(`Forked "${original.name}" successfully! Now in local sandbox copy.`, "success");
+    
+    setTerminalLines((prev) => [
+      ...prev,
+      {
+        text: `⚡ Created workspace fork: "${clone.name}" [ID: ${forkId}]`,
+        type: "system",
+        timestamp: new Date().toLocaleTimeString(),
+      },
+      {
+        text: `⚡ You can now safely experiment with and compile files inside this fork.`,
+        type: "info",
+        timestamp: new Date().toLocaleTimeString(),
+      }
+    ]);
+  };
+
   // When changing active file inside blueprint
   const handleSelectFile = (path: string) => {
     setActiveFilePath(path);
@@ -460,8 +507,9 @@ export default function App() {
 
   // Inject intentional bug to test AI repair
   const handleRestoreTypo = () => {
-    const defaultBlueprint = INITIAL_BLUEPRINTS[selectedBlueprintId];
-    const defaultFile = defaultBlueprint.files[activeFilePath];
+    const baseId = selectedBlueprintId.split("_fork_")[0];
+    const defaultBlueprint = INITIAL_BLUEPRINTS[baseId] || INITIAL_BLUEPRINTS[selectedBlueprintId];
+    const defaultFile = defaultBlueprint ? defaultBlueprint.files[activeFilePath] : null;
     if (!defaultFile) return;
 
     setBlueprints((prev) => {
@@ -854,10 +902,16 @@ export default function App() {
   // Wipe volatile memory (stateless sandbox)
   const handleWipeSandbox = () => {
     setBlueprints(JSON.parse(JSON.stringify(INITIAL_BLUEPRINTS)));
+    
+    // If selected blueprint is a fork, revert back to default blueprint
+    if (selectedBlueprintId.includes("_fork_") || !INITIAL_BLUEPRINTS[selectedBlueprintId]) {
+      setSelectedBlueprintId("react_ts_debounce");
+    }
+    
     setCompilationError(null);
     setInvocationsCount(0);
     setAiInvocations([]);
-    initTerminal(selectedBlueprintId);
+    initTerminal(selectedBlueprintId.includes("_fork_") ? "react_ts_debounce" : selectedBlueprintId);
 
     const time = new Date().toLocaleTimeString();
     setTerminalLines((prev) => [
@@ -1073,6 +1127,7 @@ export default function App() {
               blueprints={blueprints}
               selectedBlueprintId={selectedBlueprintId}
               onSelectBlueprint={handleSelectBlueprint}
+              onForkBlueprint={handleForkBlueprint}
               activeFilePath={activeFilePath}
               onSelectFile={handleSelectFile}
               activeColorClass={themeColors.activeClass}
