@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Play, RotateCcw, AlertTriangle, FileCode, CheckCircle, HelpCircle } from "lucide-react";
+import { Play, RotateCcw, AlertTriangle, FileCode, CheckCircle, HelpCircle, Camera } from "lucide-react";
 
 interface CodeEditorProps {
   filePath: string;
@@ -8,6 +8,7 @@ interface CodeEditorProps {
   language: string;
   onCompile: () => void;
   onRestoreTypo: () => void;
+  onSnapshot?: () => void;
   compilationError: string | null;
   activeColorClass: string;
   activeBorderColor: string;
@@ -24,6 +25,7 @@ export default function CodeEditor({
   language,
   onCompile,
   onRestoreTypo,
+  onSnapshot,
   compilationError,
   activeColorClass,
   activeBorderColor,
@@ -123,6 +125,19 @@ export default function CodeEditor({
             <RotateCcw className="w-3 h-3 text-warning-active" />
             <span className="hidden md:inline">Restore Typo Bug</span>
           </button>
+
+          {onSnapshot && (
+            <button
+              type="button"
+              onClick={onSnapshot}
+              title="Snapshot all files in the active blueprint to history log"
+              className="px-2 py-1.5 text-[11px] font-medium text-gray-400 hover:text-[#00b2ff] hover:bg-[#00b2ff]/5 hover:border-[#00b2ff]/20 rounded-lg border border-white/5 flex items-center gap-1 transition cursor-pointer active:scale-95"
+            >
+              <Camera className="w-3.5 h-3.5 text-[#00b2ff]" />
+              <span className="hidden md:inline">Snapshot to History</span>
+              <span className="inline md:hidden">Snapshot</span>
+            </button>
+          )}
 
           <button
             onClick={onCompile}

@@ -949,6 +949,45 @@ export default function App() {
     }
   };
 
+  // Capture code Snapshot to session history
+  const handleSaveSnapshot = () => {
+    if (!selectedBlueprint) return;
+
+    const time = new Date().toLocaleTimeString();
+    const filesCount = Object.keys(selectedBlueprint.files).length;
+
+    setExportLogs((prev) => [
+      {
+        id: `log-snapshot-${Date.now()}`,
+        action: "Manual Snapshot",
+        blueprint: selectedBlueprint.name,
+        files: activeFilePath || "All Workspace Files",
+        type: "Snapshot",
+        timestamp: time,
+        details: `Saved snapshot of active files (${filesCount} files) in "${selectedBlueprint.name}"`,
+        status: "SUCCESS",
+        codeState: {
+          blueprintName: selectedBlueprint.name,
+          language: selectedBlueprint.language,
+          files: JSON.parse(JSON.stringify(selectedBlueprint.files)),
+          activePath: activeFilePath
+        }
+      },
+      ...prev
+    ]);
+
+    showNotification(`Snapshot for "${selectedBlueprint.name}" successfully bookmarked!`, "success");
+
+    setTerminalLines((prev) => [
+      ...prev,
+      {
+        text: `📷 [Snapshot] Bookmarked workspace state. ${filesCount} files logged to session history.`,
+        type: "system",
+        timestamp: time,
+      }
+    ]);
+  };
+
   // Simulated ZIP Download helper
   const handleDownloadZip = () => {
     setZipDownloaded(true);
@@ -1149,6 +1188,7 @@ export default function App() {
                   language={activeFile.language}
                   onCompile={triggerCompilation}
                   onRestoreTypo={handleRestoreTypo}
+                  onSnapshot={handleSaveSnapshot}
                   compilationError={compilationError}
                   activeColorClass={themeColors.activeClass}
                   activeBorderColor={themeColors.borderColor}
