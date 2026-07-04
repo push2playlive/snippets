@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Directional State Color Token System */
+  /* Canvas dark background layer */
+  --color-canvas-bg: #0D1117;
+  --color-canvas-card: #13151a;
+  --color-canvas-border: rgba(255, 255, 255, 0.08);
+  --color-canvas-text-dim: rgba(255, 255, 255, 0.5);
+
+  /* Orange System: Global Brand Action & Core Tokens */
+  --color-brand-active: #ff7a00;
+  --color-brand-inactive: rgba(255, 122, 0, 0.15);
+  --color-brand-border: rgba(255, 122, 0, 0.3);
+
+  /* Blue System: Context / Infrastructure / TypeScript */
+  --color-info-active: #00b2ff;
+  --color-info-inactive: rgba(0, 178, 255, 0.15);
+  --color-info-border: rgba(0, 178, 255, 0.3);
+
+  /* Green System: Execution Success / Active Workspaces */
+  --color-success-active: #00e676;
+  --color-success-inactive: rgba(0, 230, 118, 0.15);
+  --color-success-border: rgba(0, 230, 118, 0.3);
+
+  /* Red System: Syntax Errors / Server Crashes / Destructive Triggers */
+  --color-danger-active: #ff3333;
+  --color-danger-inactive: rgba(255, 51, 51, 0.16);
+  --color-danger-border: rgba(255, 51, 51, 0.3);
+
+  /* Yellow System: Volatile Runtime Warnings */
+  --color-warning-active: #ffb300;
+  --color-warning-inactive: rgba(255, 179, 0, 0.12);
+  --color-warning-border: rgba(255, 179, 0, 0.25);
+}
+
+/* Base style resets */
+body {
+  background-color: var(--color-canvas-bg);
+  color: #f3f4f6;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+/* Custom scrollbars for developer consoles and editor */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

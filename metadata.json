@@ -1,0 +1,8 @@
+{
+  "name": "snippets.live",
+  "description": "A real-time sandboxed dev hub for frictionless utility code discovery, multi-file blueprint integration, instant terminal validation, and AI-powered safe fix-it code repairs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
