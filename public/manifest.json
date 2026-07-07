@@ -1,0 +1,24 @@
+{
+  "short_name": "snippets.live",
+  "name": "snippets.live - Stateless Code Playground",
+  "description": "Stateless Drive-Thru Testing Lab • Find, Compile, Verify, and Export code scripts instantly.",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1005/1005141.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1005/1005141.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0d1117",
+  "theme_color": "#ff7a00",
+  "display": "standalone",
+  "orientation": "portrait"
+}

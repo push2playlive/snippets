@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Shield, Sparkles, Database, Trash2, Cpu, HelpCircle, HardDrive, RefreshCcw, Zap, AlertTriangle, Play, CheckCircle } from "lucide-react";
+import { Shield, Sparkles, Database, Trash2, Cpu, HelpCircle, HardDrive, RefreshCcw, Zap, AlertTriangle, Play, CheckCircle, GitBranch, Key, Eye, EyeOff } from "lucide-react";
 import { ModelTier, AIInvocation } from "../types";
 
 interface TokenTierConfigProps {
@@ -15,6 +15,15 @@ interface TokenTierConfigProps {
   onChangeTheme: (theme: "sync" | "cyberpunk" | "nord" | "emerald" | "sunset") => void;
   isActive: boolean;
   onFocus: () => void;
+  currentBranch?: string;
+  githubToken?: string;
+  onChangeGithubToken?: (token: string) => void;
+  githubRepo?: string;
+  onChangeGithubRepo?: (repo: string) => void;
+  branchesList?: string[];
+  onCheckoutBranch?: (branch: string) => void;
+  onSyncRepository?: () => void;
+  isSyncing?: boolean;
 }
 
 export default function TokenTierConfig({
@@ -30,8 +39,18 @@ export default function TokenTierConfig({
   onChangeTheme,
   isActive,
   onFocus,
+  currentBranch = "main",
+  githubToken = "",
+  onChangeGithubToken,
+  githubRepo = "push2playlive/snippets-live-export",
+  onChangeGithubRepo,
+  branchesList = ["main", "dev", "feature/auth", "experimental"],
+  onCheckoutBranch,
+  onSyncRepository,
+  isSyncing = false,
 }: TokenTierConfigProps) {
   const [showWipeConfirm, setShowWipeConfirm] = useState(false);
+  const [showToken, setShowToken] = useState(false);
 
   // Compute simulated token savings
   const totalCostSaved = aiInvocations.reduce((acc, current) => {
@@ -295,6 +314,90 @@ export default function TokenTierConfig({
               )}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Git Repository Sync panel */}
+      <div className="p-4 bg-[#0d0e12] border-t border-canvas-border space-y-3">
+        <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-mono">
+          <GitBranch className="w-3.5 h-3.5 text-success-active animate-pulse" />
+          <span>GitHub Repository Sync</span>
+        </div>
+
+        <div className="space-y-2.5">
+          {/* Target Repository */}
+          <div className="space-y-1">
+            <label className="text-[10px] text-gray-400 block font-mono">Target Repository</label>
+            <input
+              type="text"
+              value={githubRepo}
+              onChange={(e) => onChangeGithubRepo?.(e.target.value)}
+              placeholder="username/repository-name"
+              className="w-full bg-[#14161d] text-xs text-gray-200 border border-white/5 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-success-active transition font-mono"
+            />
+          </div>
+
+          {/* Personal Access Token */}
+          <div className="space-y-1">
+            <label className="text-[10px] text-gray-400 block font-mono flex justify-between items-center">
+              <span>Personal Access Token (PAT)</span>
+              <span className="text-[9px] text-gray-500">Local Session Only</span>
+            </label>
+            <div className="relative">
+              <input
+                type={showToken ? "text" : "password"}
+                value={githubToken}
+                onChange={(e) => onChangeGithubToken?.(e.target.value)}
+                placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                className="w-full bg-[#14161d] text-xs text-gray-200 border border-white/5 rounded-lg pl-8 pr-8 py-1.5 focus:outline-none focus:border-success-active transition font-mono"
+              />
+              <Key className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <button
+                type="button"
+                onClick={() => setShowToken(!showToken)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition"
+              >
+                {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Checkout Active Branch */}
+          <div className="space-y-1">
+            <label className="text-[10px] text-gray-400 block font-mono">Checkout Active Branch</label>
+            <div className="relative">
+              <select
+                value={currentBranch}
+                onChange={(e) => onCheckoutBranch?.(e.target.value)}
+                className="w-full bg-[#14161d] text-xs text-gray-200 border border-white/5 rounded-lg pl-2.5 pr-8 py-1.5 appearance-none focus:outline-none focus:border-success-active transition font-mono cursor-pointer"
+              >
+                {branchesList.map((branch) => (
+                  <option key={branch} value={branch}>
+                    {branch === currentBranch ? `* ${branch} (Active)` : branch}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                  <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* Sync Trigger Action Button */}
+          <button
+            onClick={onSyncRepository}
+            disabled={isSyncing}
+            className={`w-full py-2 px-3 rounded-lg border text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer ${
+              isSyncing
+                ? "bg-success-inactive/10 border-success-inactive/30 text-success-active cursor-not-allowed"
+                : "bg-success-active/10 border-success-active/30 hover:border-success-active/60 text-success-active hover:bg-success-active/20"
+            }`}
+          >
+            <RefreshCcw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin text-success-active" : ""}`} />
+            <span>{isSyncing ? "Synchronizing Repo..." : "Sync with Repository"}</span>
+          </button>
         </div>
       </div>
 

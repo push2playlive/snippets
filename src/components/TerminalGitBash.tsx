@@ -16,6 +16,7 @@ interface TerminalGitBashProps {
   activeBorderColor: string;
   isActive: boolean;
   onFocus: () => void;
+  currentBranch?: string;
 }
 
 export default function TerminalGitBash({
@@ -32,6 +33,7 @@ export default function TerminalGitBash({
   activeBorderColor,
   isActive,
   onFocus,
+  currentBranch = "main",
 }: TerminalGitBashProps) {
   const [inputValue, setInputValue] = useState("");
   const [isFixing, setIsFixing] = useState(false);
@@ -217,7 +219,7 @@ export default function TerminalGitBash({
             <span>terminal_git_bash</span>
             <span className="text-gray-600">|</span>
             <GitBranch className="w-3.5 h-3.5 text-green-400" />
-            <span className="text-green-400 font-semibold text-[11px]">main</span>
+            <span className="text-green-400 font-semibold text-[11px]">{currentBranch}</span>
           </div>
         </div>
         <div className="flex items-center gap-3">

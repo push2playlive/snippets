@@ -16,6 +16,8 @@ import EarningsTracker from "./components/EarningsTracker";
 import PricingPage from "./components/PricingPage";
 import ProfilePage from "./components/ProfilePage";
 import AdminPage from "./components/AdminPage";
+import TestResults from "./components/TestResults";
+import LoginPortal from "./components/LoginPortal";
 
 // High-performance UTF-8 safe Base64 encoder for complete portable URL state-sharing
 function encodeCodeState(state: any): string {
@@ -58,6 +60,24 @@ export default function App() {
   const [selectedBlueprintId, setSelectedBlueprintId] = useState<string>("react_ts_debounce");
   const [activeFilePath, setActiveFilePath] = useState<string>("src/interceptor.ts");
 
+  // GitHub Sync & Multi-branch states
+  const [githubToken, setGithubToken] = useState<string>(() => localStorage.getItem("github_pat_token") || "");
+  const [githubRepo, setGithubRepo] = useState<string>(() => localStorage.getItem("github_repo_name") || "push2playlive/snippets-live-export");
+  const [currentBranch, setCurrentBranch] = useState<string>("main");
+  const [branchesList, setBranchesList] = useState<string[]>(["main", "dev", "feature/auth", "experimental"]);
+  const [branchFiles, setBranchFiles] = useState<{ [blueprintId: string]: { [branchName: string]: { [path: string]: FileNode } } }>({});
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  const handleSetGithubToken = (token: string) => {
+    setGithubToken(token);
+    localStorage.setItem("github_pat_token", token);
+  };
+
+  const handleSetGithubRepo = (repo: string) => {
+    setGithubRepo(repo);
+    localStorage.setItem("github_repo_name", repo);
+  };
+
   // Terminal & Compilation State
   const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([]);
   const [compilationError, setCompilationError] = useState<string | null>(null);
@@ -74,6 +94,32 @@ export default function App() {
   // Export & Alert Feedbacks
   const [copied, setCopied] = useState(false);
   const [zipDownloaded, setZipDownloaded] = useState(false);
+
+  // User Authentication States
+  const [currentUser, setCurrentUser] = useState<{ email: string; name: string; role: "admin" | "member" } | null>(() => {
+    const saved = localStorage.getItem("snippets_live_user");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved user", e);
+      }
+    }
+    return null;
+  });
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+
+  const handleLoginSuccess = (user: { email: string; name: string; role: "admin" | "member" }) => {
+    setCurrentUser(user);
+    localStorage.setItem("snippets_live_user", JSON.stringify(user));
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem("snippets_live_user");
+    showNotification("Signed out successfully. Sandbox credentials revoked.", "info");
+    setActiveNav("blueprints");
+  };
 
   // User credits & notification toast state
   const [userCredits, setUserCredits] = useState<number>(() => {
@@ -103,7 +149,7 @@ export default function App() {
   }, [notification]);
 
   // Router navigation tab state
-  const [activeNav, setActiveNav] = useState<"blueprints" | "workbench" | "documentation" | "export-history" | "pricing" | "profile" | "admin">("blueprints");
+  const [activeNav, setActiveNav] = useState<"blueprints" | "workbench" | "documentation" | "export-history" | "tests" | "pricing" | "profile" | "admin">("blueprints");
 
   // Export & Compilation logs history table state with pre-populated shareable code states
   const [exportLogs, setExportLogs] = useState<any[]>(() => {
@@ -488,6 +534,257 @@ export default function App() {
     ]);
   };
 
+  // Helper to switch or create branches in the sandbox environment
+  const handleCheckoutBranch = (branchName: string, createNew: boolean = false) => {
+    const time = new Date().toLocaleTimeString();
+    
+    if (!branchName) return;
+
+    // Validate if branch exists, if not create if requested or warn
+    const exists = branchesList.includes(branchName);
+    if (!exists && !createNew) {
+      setTerminalLines((prev) => [
+        ...prev,
+        {
+          text: `error: pathspec '${branchName}' did not match any file(s) known to git.`,
+          type: "error",
+          timestamp: time,
+        },
+      ]);
+      return;
+    }
+
+    const nextBranchesList = exists ? branchesList : [...branchesList, branchName];
+    if (!exists) {
+      setBranchesList(nextBranchesList);
+    }
+
+    // Save current active branch files before switching
+    setBranchFiles((prev) => {
+      const updated = { ...prev };
+      if (!updated[selectedBlueprintId]) {
+        updated[selectedBlueprintId] = {};
+      }
+      updated[selectedBlueprintId][currentBranch] = JSON.parse(
+        JSON.stringify(blueprints[selectedBlueprintId].files)
+      );
+      return updated;
+    });
+
+    // Determine target files for the new branch
+    const getTargetBranchFiles = (blueprintId: string, bName: string): { [path: string]: FileNode } => {
+      // 1. Check if we have previously saved state
+      if (branchFiles[blueprintId] && branchFiles[blueprintId][bName]) {
+        return branchFiles[blueprintId][bName];
+      }
+
+      // 2. Otherwise copy from main branch if available, or INITIAL_BLUEPRINTS
+      const mainFiles = (branchFiles[blueprintId] && branchFiles[blueprintId]["main"]) || 
+                        JSON.parse(JSON.stringify(INITIAL_BLUEPRINTS[blueprintId].files));
+      
+      const clonedFiles = JSON.parse(JSON.stringify(mainFiles));
+
+      // Mark all file dirty markers to false for clean starts on checkout
+      Object.keys(clonedFiles).forEach((path) => {
+        clonedFiles[path].isDirty = false;
+      });
+
+      // Customize branch files to represent a realistic remote branch download
+      if (bName === "dev") {
+        Object.keys(clonedFiles).forEach((path) => {
+          const file = clonedFiles[path];
+          if (file.content && !file.content.includes("[BRANCH: dev]")) {
+            file.content = `// [BRANCH: dev] Development active draft v2.1\n// Pre-release staging branch\n\n` + file.content;
+          }
+        });
+      } else if (bName === "feature/auth") {
+        clonedFiles["src/auth.ts"] = {
+          name: "auth.ts",
+          language: "typescript",
+          content: `// [BRANCH: feature/auth] Authentication helpers\nexport function getAuthToken(): string | null {\n  return localStorage.getItem("auth_token");\n}\n\nexport function isAuthenticated(): boolean {\n  return !!getAuthToken();\n}\n`,
+          isDirty: false
+        };
+      } else if (bName === "experimental") {
+        clonedFiles["src/sandbox_experiment.ts"] = {
+          name: "sandbox_experiment.ts",
+          language: "typescript",
+          content: `// [BRANCH: experimental] Experimental sandboxed logic\nexport function runExperiment() {\n  console.log("Running experimental features safely in isolates...");\n}\n`,
+          isDirty: false
+        };
+      }
+
+      return clonedFiles;
+    };
+
+    const targetFiles = getTargetBranchFiles(selectedBlueprintId, branchName);
+
+    // Update blueprints and switch current branch
+    setBlueprints((prev) => {
+      const copy = { ...prev };
+      copy[selectedBlueprintId].files = targetFiles;
+      return copy;
+    });
+
+    setCurrentBranch(branchName);
+
+    // Ensure activeFilePath still points to an existing file in the new branch
+    const filePaths = Object.keys(targetFiles);
+    if (!filePaths.includes(activeFilePath)) {
+      setActiveFilePath(filePaths[0] || "");
+    }
+
+    setTerminalLines((prev) => [
+      ...prev,
+      {
+        text: createNew 
+          ? `Switched to a new branch '${branchName}'`
+          : `Switched to branch '${branchName}'`,
+        type: "success",
+        timestamp: time,
+      },
+    ]);
+
+    showNotification(`Switched sandbox branch to "${branchName}"!`, "success");
+  };
+
+  // Perform two-way sync with remote GitHub repository
+  const handleSyncRepository = () => {
+    if (isSyncing) return;
+
+    const time = new Date().toLocaleTimeString();
+
+    if (!githubToken) {
+      setTerminalLines((prev) => [
+        ...prev,
+        {
+          text: `✖ Sync Aborted: GitHub Personal Access Token is required for synchronization.`,
+          type: "error",
+          timestamp: time,
+        },
+        {
+          text: `ℹ Run 'git config github.token <TOKEN>' or provide it in the credentials panel to authenticate.`,
+          type: "info",
+          timestamp: time,
+        }
+      ]);
+      showNotification("GitHub authentication required for repository sync!", "warning");
+      return;
+    }
+
+    if (compilationError) {
+      setTerminalLines((prev) => [
+        ...prev,
+        {
+          text: `✖ Sync Blocked: Cannot synchronize unstable/uncompilable code in Red State.`,
+          type: "error",
+          timestamp: time,
+        },
+        {
+          text: `ℹ Please fix compilation errors first or run safe auto-repair.`,
+          type: "info",
+          timestamp: time,
+        }
+      ]);
+      showNotification("Cannot sync code while compiler has errors!", "warning");
+      return;
+    }
+
+    setIsSyncing(true);
+
+    setTerminalLines((prev) => [
+      ...prev,
+      {
+        text: `⚡ Initiating secure two-way sync with GitHub repository: https://github.com/${githubRepo} on branch '${currentBranch}'...`,
+        type: "system",
+        timestamp: time,
+      },
+      {
+        text: `🔑 Checking credentials... GitHub Token matched [ghp_...${githubToken.substring(Math.max(0, githubToken.length - 4))}]`,
+        type: "info",
+        timestamp: time,
+      },
+      {
+        text: `📦 [1/3] Fetching latest remote commits from 'origin/${currentBranch}'...`,
+        type: "info",
+        timestamp: time,
+      }
+    ]);
+
+    setTimeout(() => {
+      const midTime = new Date().toLocaleTimeString();
+      
+      // Simulate merging remote file modifications
+      setTerminalLines((prev) => [
+        ...prev,
+        {
+          text: `⬇️ [2/3] Pulling remote updates: Fast-forwarding local copy to match upstream.`,
+          type: "info",
+          timestamp: midTime,
+        },
+        {
+          text: `✨ Auto-merging clean changes. No conflict detected.`,
+          type: "success",
+          timestamp: midTime,
+        },
+        {
+          text: `📤 [3/3] Pushing local changes to remote 'origin/${currentBranch}'...`,
+          type: "info",
+          timestamp: midTime,
+        }
+      ]);
+
+      setTimeout(() => {
+        const endTime = new Date().toLocaleTimeString();
+
+        // Save current files state to local history as a record, and mark all files as clean
+        setBlueprints((prev) => {
+          const copy = { ...prev };
+          const files = copy[selectedBlueprintId].files;
+          Object.keys(files).forEach((path) => {
+            files[path].isDirty = false;
+          });
+          return copy;
+        });
+
+        const filesCount = Object.keys(blueprints[selectedBlueprintId].files).length;
+
+        // Add sync to exportLogs history
+        setExportLogs((prevLogs) => [
+          {
+            id: `log-sync-${Date.now()}`,
+            action: "GitHub Repository Sync",
+            blueprint: selectedBlueprint.name,
+            files: `All ${filesCount} Workspace Files`,
+            type: "GitHub Sync",
+            timestamp: endTime,
+            details: `Clean two-way sync with https://github.com/${githubRepo} (${currentBranch}). Checked out and verified.`,
+            status: "SUCCESS",
+            codeState: {
+              blueprintName: selectedBlueprint.name,
+              language: selectedBlueprint.language,
+              files: JSON.parse(JSON.stringify(blueprints[selectedBlueprintId].files)),
+              activePath: activeFilePath
+            }
+          },
+          ...prevLogs
+        ]);
+
+        setTerminalLines((prev) => [
+          ...prev,
+          {
+            text: `✔ Repository synchronized successfully! Local and remote copies of '${selectedBlueprint.name}' are fully aligned on branch '${currentBranch}'.`,
+            type: "success",
+            timestamp: endTime,
+          }
+        ]);
+
+        setIsSyncing(false);
+        showNotification("GitHub Repository synced successfully!", "success");
+      }, 1500);
+
+    }, 1500);
+  };
+
   // When changing active file inside blueprint
   const handleSelectFile = (path: string) => {
     setActiveFilePath(path);
@@ -602,6 +899,8 @@ export default function App() {
 
   // Simulate Git client events
   const handleGitCommands = (cmd: string, time: string) => {
+    const args = cmd.split(" ").map(s => s.trim()).filter(Boolean);
+
     if (cmd === "git status") {
       const editedFiles = (Object.entries(selectedBlueprint.files) as [string, FileNode][])
         .filter(([_, f]) => f.isDirty)
@@ -609,7 +908,7 @@ export default function App() {
 
       setTerminalLines((prev) => [
         ...prev,
-        { text: `On branch main\nYour branch is up to date with 'origin/main'.`, type: "info", timestamp: time },
+        { text: `On branch ${currentBranch}\nYour branch is up to date with 'origin/${currentBranch}'.`, type: "info", timestamp: time },
         {
           text: editedFiles.length > 0
             ? `Changes not staged for commit:\n  (use "git add <file>..." to stage)\n\n${editedFiles.join("\n")}`
@@ -619,7 +918,8 @@ export default function App() {
         },
       ]);
     } else if (cmd.startsWith("git clone ")) {
-      const repo = cmd.substring(10);
+      const repo = cmd.substring(10).trim();
+      handleSetGithubRepo(repo);
       setTerminalLines((prev) => [
         ...prev,
         { text: `Cloning repository into '${repo}'...`, type: "info", timestamp: time },
@@ -628,42 +928,78 @@ export default function App() {
         { text: `Unpacking objects: 100% (42/42), 12.18 KiB | 1.22 MiB/s, done.`, type: "info", timestamp: time },
         { text: `Repository synchronized. File structure parsed in browser sandbox.`, type: "success", timestamp: time },
       ]);
-    } else if (cmd.startsWith("git checkout -b ")) {
-      const branch = cmd.substring(16);
+    } else if (cmd.startsWith("git config ") && cmd.includes("github.token")) {
+      const tokenIndex = args.indexOf("github.token") !== -1 ? args.indexOf("github.token") + 1 : -1;
+      const token = tokenIndex !== -1 && args[tokenIndex] ? args[tokenIndex] : "";
+      if (token) {
+        handleSetGithubToken(token);
+        setTerminalLines((prev) => [
+          ...prev,
+          { text: `✔ GitHub Token configured successfully!`, type: "success", timestamp: time },
+          { text: `ℹ Token: ghp_****${token.substring(Math.max(0, token.length - 4))}`, type: "info", timestamp: time },
+        ]);
+        showNotification("GitHub Personal Access Token configured!", "success");
+      } else {
+        setTerminalLines((prev) => [
+          ...prev,
+          { text: `error: missing token value for 'github.token'`, type: "error", timestamp: time },
+        ]);
+      }
+    } else if (cmd.startsWith("git auth ")) {
+      const token = cmd.substring(9).trim();
+      if (token) {
+        handleSetGithubToken(token);
+        setTerminalLines((prev) => [
+          ...prev,
+          { text: `✔ Authenticated with GitHub Personal Access Token successfully!`, type: "success", timestamp: time },
+        ]);
+        showNotification("GitHub authenticated successfully!", "success");
+      } else {
+        setTerminalLines((prev) => [
+          ...prev,
+          { text: `error: please provide a valid Personal Access Token. Usage: git auth <TOKEN>`, type: "error", timestamp: time },
+        ]);
+      }
+    } else if (cmd === "git branch") {
+      const branchLines = branchesList.map((b) => 
+        b === currentBranch ? `* \x1b[32m${b}\x1b[0m (active)` : `  ${b}`
+      ).join("\n");
       setTerminalLines((prev) => [
         ...prev,
-        { text: `Switched to a new branch '${branch}'`, type: "success", timestamp: time },
+        { text: `Local branches:\n${branchLines}`, type: "info", timestamp: time },
       ]);
+    } else if (cmd === "git branch -a" || cmd === "git branch -r") {
+      const branchLines = branchesList.map((b) => 
+        b === currentBranch ? `* \x1b[32m${b}\x1b[0m (active)` : `  ${b}`
+      ).join("\n");
+      const remoteBranchLines = branchesList.map((b) => `  remotes/origin/${b}`).join("\n");
+      setTerminalLines((prev) => [
+        ...prev,
+        { text: `Local & Remote branches:\n${branchLines}\n\nRemote upstream branches:\n${remoteBranchLines}`, type: "info", timestamp: time },
+      ]);
+    } else if (cmd.startsWith("git checkout -b ")) {
+      const branch = cmd.substring(16).trim();
+      handleCheckoutBranch(branch, true);
+    } else if (cmd.startsWith("git checkout ")) {
+      const branch = cmd.substring(13).trim();
+      handleCheckoutBranch(branch, false);
     } else if (cmd.startsWith("git commit")) {
       const editedFilesCount = (Object.values(selectedBlueprint.files) as FileNode[]).filter((f) => f.isDirty).length;
       if (editedFilesCount === 0) {
         setTerminalLines((prev) => [
           ...prev,
-          { text: `On branch main\nnothing to commit, working tree clean`, type: "info", timestamp: time },
+          { text: `On branch ${currentBranch}\nnothing to commit, working tree clean`, type: "info", timestamp: time },
         ]);
         return;
       }
 
       setTerminalLines((prev) => [
         ...prev,
-        { text: `[main 4f1a293] local changes committed in tab-sandbox`, type: "success", timestamp: time },
+        { text: `[${currentBranch} 4f1a293] local changes committed in tab-sandbox`, type: "success", timestamp: time },
         { text: ` ${editedFilesCount} file(s) changed, local staging buffer flushed.`, type: "info", timestamp: time },
       ]);
-    } else if (cmd === "git push") {
-      if (compilationError) {
-        setTerminalLines((prev) => [
-          ...prev,
-          { text: `Git Push Blocked: Cannot sync unstable code on snippets.live.`, type: "error", timestamp: time },
-          { text: `✖ Abort: Resolution failed. Please run Safe Auto-Repair first.`, type: "error", timestamp: time },
-        ]);
-      } else {
-        setTerminalLines((prev) => [
-          ...prev,
-          { text: `Pushing branch 'main' to secure registry...`, type: "info", timestamp: time },
-          { text: `Connection established: https://github.com/push2playlive/snippets-live-export`, type: "info", timestamp: time },
-          { text: `✔ Repository synchronized successfully (Green). Pit-stop complete!`, type: "success", timestamp: time },
-        ]);
-      }
+    } else if (cmd === "git push" || cmd === "git pull" || cmd === "git sync") {
+      handleSyncRepository();
     } else {
       setTerminalLines((prev) => [
         ...prev,
@@ -1030,6 +1366,27 @@ export default function App() {
     ]);
   };
 
+  const handleNavClick = (tab: "blueprints" | "workbench" | "documentation" | "export-history" | "tests" | "pricing" | "profile" | "admin") => {
+    if (tab === "admin") {
+      if (!currentUser) {
+        showNotification("Administrative registry clearance required.", "warning");
+        setIsLoginOpen(true);
+        return;
+      }
+      if (currentUser.role !== "admin") {
+        showNotification("Access Denied: Only system administrators can enter the admin console.", "warning");
+        return;
+      }
+    } else if (tab === "workbench" || tab === "export-history" || tab === "profile") {
+      if (!currentUser) {
+        showNotification(`Registry membership authentication required for ${tab.toUpperCase()} access.`, "warning");
+        setIsLoginOpen(true);
+        return;
+      }
+    }
+    setActiveNav(tab);
+  };
+
   return (
     <div className="min-h-screen bg-canvas-bg flex flex-col selection:bg-lang-blue-inactive select-none">
       {/* Visual Top Navigation Header */}
@@ -1055,7 +1412,7 @@ export default function App() {
         {/* Primary Navigation Routers */}
         <nav className="flex flex-wrap items-center bg-black/40 p-1 rounded-xl border border-white/5 font-mono text-[11px] font-bold gap-1 sm:gap-0">
           <button
-            onClick={() => setActiveNav("blueprints")}
+            onClick={() => handleNavClick("blueprints")}
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
               activeNav === "blueprints"
                 ? "bg-info-inactive text-[#00b2ff] border border-info-border/30 shadow-md shadow-[#00b2ff]/5"
@@ -1065,7 +1422,7 @@ export default function App() {
             BLUEPRINTS
           </button>
           <button
-            onClick={() => setActiveNav("workbench")}
+            onClick={() => handleNavClick("workbench")}
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
               activeNav === "workbench"
                 ? "bg-brand-inactive text-brand-active border border-brand-border/30 shadow-md shadow-brand-active/5"
@@ -1075,7 +1432,7 @@ export default function App() {
             AGENTS WORKBENCH
           </button>
           <button
-            onClick={() => setActiveNav("documentation")}
+            onClick={() => handleNavClick("documentation")}
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
               activeNav === "documentation"
                 ? "bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20 shadow-md shadow-[#10b981]/5"
@@ -1085,7 +1442,7 @@ export default function App() {
             DOCUMENTATION
           </button>
           <button
-            onClick={() => setActiveNav("export-history")}
+            onClick={() => handleNavClick("export-history")}
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
               activeNav === "export-history"
                 ? "bg-success-inactive text-success-active border border-success-border/20 shadow-md shadow-success-active/5"
@@ -1095,7 +1452,17 @@ export default function App() {
             EXPORT HISTORY
           </button>
           <button
-            onClick={() => setActiveNav("pricing")}
+            onClick={() => handleNavClick("tests")}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              activeNav === "tests"
+                ? "bg-[#00b2ff]/10 text-[#00b2ff] border border-[#00b2ff]/25 shadow-md shadow-[#00b2ff]/5"
+                : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            TEST RESULTS
+          </button>
+          <button
+            onClick={() => handleNavClick("pricing")}
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
               activeNav === "pricing"
                 ? "bg-[#ff7a00]/10 text-brand-active border border-[#ff7a00]/20 shadow-md"
@@ -1105,7 +1472,7 @@ export default function App() {
             PRICING
           </button>
           <button
-            onClick={() => setActiveNav("profile")}
+            onClick={() => handleNavClick("profile")}
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
               activeNav === "profile"
                 ? "bg-purple-950/20 text-[#c084fc] border border-purple-500/20 shadow-md"
@@ -1115,7 +1482,7 @@ export default function App() {
             PROFILE
           </button>
           <button
-            onClick={() => setActiveNav("admin")}
+            onClick={() => handleNavClick("admin")}
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
               activeNav === "admin"
                 ? "bg-red-950/20 text-danger-active border border-red-500/20 shadow-md"
@@ -1128,6 +1495,34 @@ export default function App() {
 
         {/* Right-Aligned Main Triggers */}
         <div className="flex items-center gap-3">
+          {currentUser ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/40 border border-white/5 font-mono text-[10px] shadow-inner relative shrink-0">
+              <span className={`w-2 h-2 rounded-full ${currentUser.role === 'admin' ? 'bg-red-500 animate-pulse' : 'bg-purple-500 animate-pulse'}`} />
+              <span className="text-gray-300 font-bold max-w-[80px] truncate">{currentUser.name}</span>
+              <span className={`px-1 py-0.2 rounded text-[8px] font-black uppercase ${
+                currentUser.role === 'admin' 
+                  ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
+                  : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+              }`}>{currentUser.role}</span>
+              
+              <button
+                onClick={handleLogout}
+                title="Sign Out of Sandbox Registry"
+                className="ml-1 p-0.5 rounded hover:bg-white/5 text-gray-500 hover:text-white transition cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsLoginOpen(true)}
+              className="px-3 py-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-brand-active text-[11px] font-bold font-mono transition cursor-pointer flex items-center gap-1 shadow-md shadow-orange-500/5 active:scale-95 shrink-0"
+            >
+              <Lock className="w-3 h-3 text-[#ff7a00]" />
+              <span>SIGN IN</span>
+            </button>
+          )}
+
           <EarningsTracker />
 
           {/* Dynamic Cap/Pro Indicator button */}
@@ -1220,6 +1615,7 @@ export default function App() {
                 activeBorderColor={themeColors.borderColor}
                 isActive={activePanel === "terminal"}
                 onFocus={() => setActivePanel("terminal")}
+                currentBranch={currentBranch}
               />
             </div>
           </section>
@@ -1239,6 +1635,15 @@ export default function App() {
               onChangeTheme={setActiveTheme}
               isActive={activePanel === "config"}
               onFocus={() => setActivePanel("config")}
+              currentBranch={currentBranch}
+              githubToken={githubToken}
+              onChangeGithubToken={handleSetGithubToken}
+              githubRepo={githubRepo}
+              onChangeGithubRepo={handleSetGithubRepo}
+              branchesList={branchesList}
+              onCheckoutBranch={(branch) => handleCheckoutBranch(branch, false)}
+              onSyncRepository={handleSyncRepository}
+              isSyncing={isSyncing}
             />
           </section>
         </main>
@@ -1425,6 +1830,10 @@ export default function App() {
             </div>
           </div>
         </main>
+      )}
+
+      {activeNav === "tests" && (
+        <TestResults onShowNotification={showNotification} />
       )}
 
       {activeNav === "pricing" && (
@@ -1631,6 +2040,14 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Progressive Web App / Session Authentication Portal */}
+      <LoginPortal
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
+        onShowNotification={showNotification}
+      />
     </div>
   );
 }
