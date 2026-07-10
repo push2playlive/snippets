@@ -85,7 +85,7 @@ interface RequestConfig {
 }
 
 // Typo 'functon' introduced for testing the Safe Fix-It loop!
-functon requestInterceptor(config: RequestConfig): RequestConfig {
+function requestInterceptor(config: RequestConfig): RequestConfig {
   const token = localStorage.getItem("auth_token") || "GUEST_SECURE_TOKEN";
   
   if (token) {

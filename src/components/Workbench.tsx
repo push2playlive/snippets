@@ -695,14 +695,18 @@ export default function Workbench() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={runCompilationCheck}
-                    disabled={isCompiling}
-                    className="px-3.5 py-1.5 rounded bg-brand-inactive border border-brand-border/40 hover:bg-orange-950/20 text-brand-active font-mono text-[10px] font-bold cursor-pointer transition flex items-center gap-1.5 disabled:opacity-50"
-                  >
-                    <Play className={`w-3 h-3 ${isCompiling ? "animate-spin" : ""}`} />
-                    <span>{isCompiling ? "COMPILING..." : "COMPILE CHECK"}</span>
-                  </button>
+                  <div className="p-0.5 rounded-xl bg-gradient-to-b from-gray-700 via-gray-900 to-[#07080b] border border-white/10 shadow-md">
+                    <div className="p-0.5 rounded-lg bg-black border border-white/5 shadow-inner">
+                      <button
+                        onClick={runCompilationCheck}
+                        disabled={isCompiling}
+                        className="px-3.5 py-1.5 rounded-md bg-gradient-to-b from-[#ff7a00] to-orange-600 hover:from-orange-400 hover:to-orange-500 text-black font-mono text-[10px] font-extrabold cursor-pointer transition duration-150 flex items-center gap-1.5 shadow-[0_2px_4px_rgba(255,122,0,0.3)] active:translate-y-0.5 active:scale-95 active:shadow-none disabled:opacity-50"
+                      >
+                        <Play className={`w-3 h-3 ${isCompiling ? "animate-spin" : ""}`} />
+                        <span>{isCompiling ? "COMPILING..." : "COMPILE CHECK"}</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

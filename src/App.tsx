@@ -18,6 +18,7 @@ import ProfilePage from "./components/ProfilePage";
 import AdminPage from "./components/AdminPage";
 import TestResults from "./components/TestResults";
 import LoginPortal from "./components/LoginPortal";
+import CommandNexusGateway from "./components/CommandNexusGateway";
 
 // High-performance UTF-8 safe Base64 encoder for complete portable URL state-sharing
 function encodeCodeState(state: any): string {
@@ -149,7 +150,7 @@ export default function App() {
   }, [notification]);
 
   // Router navigation tab state
-  const [activeNav, setActiveNav] = useState<"blueprints" | "workbench" | "documentation" | "export-history" | "tests" | "pricing" | "profile" | "admin">("blueprints");
+  const [activeNav, setActiveNav] = useState<"blueprints" | "workbench" | "documentation" | "export-history" | "tests" | "pricing" | "profile" | "admin" | "commandnexus">("blueprints");
 
   // Export & Compilation logs history table state with pre-populated shareable code states
   const [exportLogs, setExportLogs] = useState<any[]>(() => {
@@ -1366,7 +1367,7 @@ export default function App() {
     ]);
   };
 
-  const handleNavClick = (tab: "blueprints" | "workbench" | "documentation" | "export-history" | "tests" | "pricing" | "profile" | "admin") => {
+  const handleNavClick = (tab: "blueprints" | "workbench" | "documentation" | "export-history" | "tests" | "pricing" | "profile" | "admin" | "commandnexus") => {
     if (tab === "admin") {
       if (!currentUser) {
         showNotification("Administrative registry clearance required.", "warning");
@@ -1388,7 +1389,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-canvas-bg flex flex-col selection:bg-lang-blue-inactive select-none">
+    <div className="min-h-screen bg-canvas-bg flex flex-col selection:bg-lang-blue-inactive">
       {/* Visual Top Navigation Header */}
       <header className="px-6 py-4 bg-[#0d1117] border-b border-canvas-border flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         {/* Logo and Tagline */}
@@ -1491,6 +1492,16 @@ export default function App() {
           >
             ADMIN
           </button>
+          <button
+            onClick={() => handleNavClick("commandnexus")}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              activeNav === "commandnexus"
+                ? "bg-orange-500/25 text-[#ff7a00] border border-orange-500/40 shadow-md shadow-orange-500/10"
+                : "text-gray-400 hover:text-[#ff7a00]"
+            }`}
+          >
+            COMMANDNEXUS GATEWAY
+          </button>
         </nav>
 
         {/* Right-Aligned Main Triggers */}
@@ -1514,13 +1525,17 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <button
-              onClick={() => setIsLoginOpen(true)}
-              className="px-3 py-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-brand-active text-[11px] font-bold font-mono transition cursor-pointer flex items-center gap-1 shadow-md shadow-orange-500/5 active:scale-95 shrink-0"
-            >
-              <Lock className="w-3 h-3 text-[#ff7a00]" />
-              <span>SIGN IN</span>
-            </button>
+            <div className="p-0.5 rounded-xl bg-gradient-to-b from-gray-700 via-gray-900 to-[#07080b] border border-white/10 shadow-md">
+              <div className="p-0.5 rounded-lg bg-black border border-white/5 shadow-inner">
+                <button
+                  onClick={() => setIsLoginOpen(true)}
+                  className="px-3 py-1 rounded-md bg-gradient-to-b from-[#ff7a00] to-orange-600 hover:from-orange-400 hover:to-orange-500 text-black font-extrabold font-mono text-[11px] transition duration-150 cursor-pointer flex items-center gap-1 shadow-[0_2px_4px_rgba(255,122,0,0.3)] active:translate-y-0.5 active:scale-95 active:shadow-none"
+                >
+                  <Lock className="w-3 h-3 text-black" />
+                  <span>SIGN IN</span>
+                </button>
+              </div>
+            </div>
           )}
 
           <EarningsTracker />
@@ -1538,17 +1553,21 @@ export default function App() {
             <span>PRO TIER: {modelTier === "pro" ? "ENABLED" : "OFFLINE"}</span>
           </button>
 
-          {/* Export & Exit Button */}
-          <button
-            onClick={() => {
-              handleDownloadZip();
-              alert("Export initiated! Your volatile container changes have been packed. Terminating secure local connection pool safely (simulated).");
-            }}
-            className="px-4 py-1.5 rounded-lg bg-danger-active hover:bg-red-600 text-xs font-bold text-white flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-red-500/10 active:scale-95"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>EXPORT & EXIT</span>
-          </button>
+          {/* Export & Exit Button with Tactile Push Button Design */}
+          <div className="p-0.5 rounded-xl bg-gradient-to-b from-gray-700 via-gray-900 to-[#07080b] border border-white/10 shadow-md">
+            <div className="p-0.5 rounded-lg bg-black border border-white/5 shadow-inner">
+              <button
+                onClick={() => {
+                  handleDownloadZip();
+                  alert("Export initiated! Your volatile container changes have been packed. Terminating secure local connection pool safely (simulated).");
+                }}
+                className="px-4 py-1.5 rounded-md bg-gradient-to-b from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 text-xs font-bold text-white flex items-center gap-1.5 transition duration-150 cursor-pointer shadow-[0_2px_4px_rgba(239,68,68,0.3)] active:translate-y-0.5 active:scale-95 active:shadow-none"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>EXPORT & EXIT</span>
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -1858,6 +1877,15 @@ export default function App() {
       {activeNav === "admin" && (
         <AdminPage
           onShowNotification={showNotification}
+        />
+      )}
+
+      {activeNav === "commandnexus" && (
+        <CommandNexusGateway
+          userCredits={userCredits}
+          onAddCredits={handleAddCredits}
+          onShowNotification={showNotification}
+          currentUser={currentUser}
         />
       )}
 
